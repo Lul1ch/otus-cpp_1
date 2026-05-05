@@ -2,7 +2,7 @@
 
 #include <iostream>
 
-// Кто прочитал, тот зайка!
+// Кто прочитал, тот зайка! //
 
 int main(int, char **) {
 	std::cout << "Version: " << version() << std::endl;
