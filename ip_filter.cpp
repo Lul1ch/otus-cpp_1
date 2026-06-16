@@ -105,7 +105,7 @@ bool isAnyByteEqualTo(const IpAddress& ip, uint16_t value)
 	return ip.getFirst() == value || ip.getSecond() == value || ip.getThird() == value || ip.getFourth() == value;
 }
 
-int main(int argc, char** argv)
+int main(int,char **)
 {
 	std::string input;
 	std::vector<IpAddress> ips;
