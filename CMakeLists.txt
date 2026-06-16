@@ -5,12 +5,11 @@ set(PROJECT_VESRION 0.0.${PATCH_VERSION})
 
 project(ipfilter VERSION ${PROJECT_VESRION})
 
-option(WITH_BOOST_TEST "Whether to build Boost test" ON)
+option(WITH_BOOST_TEST "Whether to build Boost test" OFF)
 
 configure_file(version.h.in version.h)
 
-add_executable(ipfilter_cli main.cpp)
-add_library(ipfilter lib.cpp)
+add_executable(ipfilter_cli ip_filter.cpp)
 
 set_target_properties(ipfilter_cli ipfilter PROPERTIES
     CXX_STANDARD 14
