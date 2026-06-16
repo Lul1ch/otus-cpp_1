@@ -11,17 +11,9 @@ configure_file(version.h.in version.h)
 
 add_executable(ipfilter_cli ip_filter.cpp)
 
-set_target_properties(ipfilter_cli ipfilter PROPERTIES
+set_target_properties(ipfilter_cli PROPERTIES
     CXX_STANDARD 14
     CXX_STANDARD_REQUIRED ON
-)
-
-target_include_directories(ipfilter
-    PRIVATE "${CMAKE_BINARY_DIR}"
-)
-
-target_link_libraries(ipfilter_cli PRIVATE
-    ipfilter
 )
 
 if(WITH_BOOST_TEST)
@@ -37,18 +29,11 @@ if(WITH_BOOST_TEST)
         COMPILE_DEFINITIONS BOOST_TEST_DYN_LINK
         INCLUDE_DIRECTORIES ${Boost_INCLUDE_DIR}
     )
-
-    target_link_libraries(test_version
-        ${Boost_LIBRARIES}
-        ipfilter
-    )
+    
 endif()
 
 if (MSVC)
     target_compile_options(ipfilter_cli PRIVATE
-        /W4
-    )
-    target_compile_options(ipfilter PRIVATE
         /W4
     )
     if(WITH_BOOST_TEST)
@@ -58,9 +43,6 @@ if (MSVC)
     endif()
 else ()
     target_compile_options(ipfilter_cli PRIVATE
-        -Wall -Wextra -pedantic -Werror
-    )
-    target_compile_options(ipfilter PRIVATE
         -Wall -Wextra -pedantic -Werror
     )
     if(WITH_BOOST_TEST)
