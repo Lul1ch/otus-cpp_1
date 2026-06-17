@@ -9,7 +9,7 @@ option(WITH_BOOST_TEST "Whether to build Boost test" ON)
 
 configure_file(version.h.in version.h)
 
-add_executable(ipfilter_cli ipfilter.cpp)
+add_executable(ipfilter_cli ip_filter.cpp)
 add_library(ipfilter lib.cpp)
 
 set_target_properties(ipfilter_cli ipfilter PROPERTIES
