@@ -5,6 +5,8 @@
 #include <sstream>
 #include <algorithm>
 
+#include "lib.h"
+
 class IpAddress
 {
 	uint16_t first;
