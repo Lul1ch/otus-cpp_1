@@ -89,7 +89,7 @@ std::string parseIpStr(std::string str)
 	{
 		return str;
 	}
-	return str.substr(0, pos-1);
+	return str.substr(0, pos);
 }
 
 bool isFirstByteEqualTo(const IpAddress& ip, uint16_t value)
