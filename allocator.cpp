@@ -146,15 +146,15 @@ int main()
     }
 
     std::cout << "Map and standard allocator\n";
-    for (const auto& [key, value] : map1) 
+    for (const auto& kv : map1) 
     {
-        std::cout << key << " -> " << value << "\n";
+        std::cout << kv.first << " -> " << kv.second << "\n";
     }
 
 	std::cout << "Map and custom allocator\n";
-    for (const auto& [key, value] : map2) 
+    for (const auto& kv : map2) 
     {
-        std::cout << key << " -> " << value << "\n";
+        std::cout << kv.first << " -> " << kv.second << "\n";
     }
 
     std::cout << "Custom array and standard allocator\n";
