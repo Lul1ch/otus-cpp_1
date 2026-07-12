@@ -23,10 +23,16 @@ public:
     using propagate_on_container_move_assignment = std::true_type;
     using propagate_on_container_swap = std::true_type;
 
-    CustomAllocator() noexcept = default;
+    CustomAllocator() noexcept
+        : m_buffer(static_cast<T*>(::operator new(sizeof(T) * BlocksCount))),
+          m_capacity(BlocksCount),
+          m_used(0)
+    {}
 
     template <class U>
-    CustomAllocator(const CustomAllocator<U, BlocksCount>&) noexcept {}
+    CustomAllocator(const CustomAllocator<U, BlocksCount>&) noexcept
+        : CustomAllocator()
+    {}
 
     CustomAllocator(const CustomAllocator&) noexcept = default;
     CustomAllocator& operator=(const CustomAllocator&) noexcept = default;
@@ -34,26 +40,35 @@ public:
     CustomAllocator(CustomAllocator&&) noexcept = default;
     CustomAllocator& operator=(CustomAllocator&&) noexcept = default;
 
-    ~CustomAllocator() = default;
+    ~CustomAllocator()
+    {
+        ::operator delete(m_buffer);
+    }
 
     T* allocate(std::size_t n) 
     {
         if (n == 0) {
             return nullptr;
         }
-        if (n > BlocksCount) {
+        if (n > BlocksCount || m_used + n > m_capacity) {
             throw std::bad_alloc();
         }
-        return static_cast<T*>(::operator new(n * sizeof(T)));
+        T* result = m_buffer + m_used;
+        m_used += n;
+        return result;
     }
 
-    void deallocate(T* p, std::size_t) noexcept 
+    void deallocate(T*, std::size_t) noexcept 
     {
-        ::operator delete(p);
     }
 
     template <class U, std::size_t C>
     friend class CustomAllocator;
+
+private:
+    T* m_buffer = nullptr;
+    std::size_t m_capacity = 0;
+    std::size_t m_used = 0;
 };
 
 template <typename T, std::size_t C, typename U>
@@ -77,7 +92,8 @@ public:
     explicit DynamicArray(std::size_t capacity, Alloc alloc = Alloc{})
         : m_alloc(std::move(alloc)),
           m_data(traits::allocate(m_alloc, capacity)),
-          m_capacity(capacity) {}
+          m_capacity(capacity)
+    {}
 
     ~DynamicArray() 
     {
@@ -108,7 +124,7 @@ public:
 
     T* begin() noexcept { return m_data; }
     T* end() noexcept { return m_data + m_size; }
-    std::size_t size() { return m_size; }
+    std::size_t size() const noexcept { return m_size; }
 
 private:
     Alloc m_alloc;
@@ -151,7 +167,7 @@ int main()
         std::cout << kv.first << " -> " << kv.second << "\n";
     }
 
-	std::cout << "Map and custom allocator\n";
+    std::cout << "Map and custom allocator\n";
     for (const auto& kv : map2) 
     {
         std::cout << kv.first << " -> " << kv.second << "\n";
