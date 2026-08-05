@@ -79,30 +79,29 @@ private:
     T m_square;
 };
 
-
 class Field
 {
 public:
 
-    virtual void updateFieldContent() {}
-    virtual void loadFieldContent() {}
+    virtual void updateFieldContent();
+    virtual void loadFieldContent();
 };
 
 template <typename T>
 class GraphicField : public Field
 {
 public:
-    void updateFieldContent() override {}
-    void loadFieldContent() override {}
+    void updateFieldContent() override;
+    void loadFieldContent() override;
     
     template <typename U>
-    void drawFigure(const Figure<U>& figure) {}
+    void drawFigure(const Figure<U>& figure);
     
     template <typename U>
-    void eraseFigure(const Figure<U>& figure) {}
+    void eraseFigure(const Figure<U>& figure);
     
     template <typename U>
-    void moveFigure(const Figure<U>& figure, Dot<U> new_coordinates) {}
+    void moveFigure(const Figure<U>& figure, Dot<U> new_coordinates);
     
     template <typename U>
     std::vector<Figure<U>>& getFiguresList() { return m_figures_vec; }
@@ -114,9 +113,9 @@ private:
 class TextField : public Field
 {
 public:
-    void updateFieldContent() override {}
-    void loadFieldContent() override {}
-    void editText(size_t substr_start, size_t substr_end, std::string new_substr) {}
+    void updateFieldContent() override;
+    void loadFieldContent() override;
+    void editText(size_t substr_start, size_t substr_end, std::string new_substr);
 private:
     std::string m_document_text;
 };
@@ -127,24 +126,24 @@ class ContentField
 public:
 //Graphic
     template <typename U>
-    void drawCircle(Dot<U> center, U radius, int layer) {}
+    void drawCircle(Dot<U> center, U radius, int layer);
 
     template <typename U>
-    void drawSquare(Dot<U> center, U side, int layer) {}
+    void drawSquare(Dot<U> center, U side, int layer);
 
     template <typename U>
-    void drawTriangle(Dot<U> center, U high, U side, int layer) {}
+    void drawTriangle(Dot<U> center, U high, U side, int layer);
 
     template <typename U>
-    void eraseFigure(Dot<U> dot) {}
+    void eraseFigure(Dot<U> dot);
 
     template <typename U>
-    void moveFigure(Dot<U> dot) {}
+    void moveFigure(Dot<U> dot);
 //Text
-    void editTextField(size_t substr_start, size_t substr_end, std::string text) {}
+    void editTextField(size_t substr_start, size_t substr_end, std::string text);
 //General
     template <typename U>
-    Figure<U>& findPropriateFigure(Dot<U> dot) {}
+    Figure<U>& findPropriateFigure(Dot<U> dot);
 private:
 
     std::unique_ptr<TextField> m_text_field;
@@ -155,21 +154,32 @@ class Document
 {
 public:
 
+    bool checkDocumentIsValid()
+    {
+        return true;
+    }
+
     std::string const getPathToDocument()
     {
         return m_path_to_file;
     }
 
     template <typename U>
-    TextField* const loadTextFiledFromDocument()
+    TextField* const loadGraphicFieldFromDocument()
     {
         return new TextField();
     }
 
     template <typename U>
-    GraphicField<U>* const loadGraphicFiledFromDocument()
+    GraphicField<U>* const loadGraphicFieldFromDocument()
     {
         return new GraphicField<U>();
+    }
+
+    template <typename U>
+    ContentField<U>* const loadContentFieldFromDocument()
+    {
+        return new ContentField<U>();
     }
 
 private:
@@ -200,8 +210,17 @@ template <typename T>
 class TextEditor
 {
 public:
-    void processTextEditRequest(UserRequest& req) {}
-    void loadTextPart(const std::shared_ptr<Document>& doc) {}
+    void processTextEditRequest(UserRequest& req);
+    void loadTextPart(const std::shared_ptr<Document>& doc) 
+    {
+        if (doc->checkDocumentIsValid())
+        {
+            /*
+                Загружаем контент из файла
+                m_content_field = std::make_shared<ContentField<T>>(doc->loadContentFieldFromDocument());
+            */
+        }
+    }
 private:
 
     std::shared_ptr<ContentField<T>> m_content_field;
@@ -211,8 +230,17 @@ template <typename T>
 class GraphicEditor
 {
 public:
-    void processGraphicEditRequest(UserRequest& req) {}
-    void loadGraphicPart(const std::shared_ptr<Document>& doc) {}
+    void processGraphicEditRequest(UserRequest& req);
+    void loadGraphicPart(const std::shared_ptr<Document>& doc) 
+    {
+        if (doc->checkDocumentIsValid())
+        {
+            /*
+                Загружаем контент из файла
+                m_content_field = std::make_shared<ContentField<T>>(doc->loadContentFieldFromDocument());
+            */
+        }
+    }
 private:
 
     std::shared_ptr<ContentField<T>> m_content_field;
