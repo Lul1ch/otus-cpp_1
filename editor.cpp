@@ -164,20 +164,19 @@ public:
         return m_path_to_file;
     }
 
-    template <typename U>
-    TextField* const loadGraphicFieldFromDocument()
+    TextField* loadTextFieldFromDocument()
     {
         return new TextField();
     }
 
     template <typename U>
-    GraphicField<U>* const loadGraphicFieldFromDocument()
+    GraphicField<U>* loadGraphicFieldFromDocument()
     {
         return new GraphicField<U>();
     }
 
     template <typename U>
-    ContentField<U>* const loadContentFieldFromDocument()
+    ContentField<U>* loadContentFieldFromDocument()
     {
         return new ContentField<U>();
     }
@@ -251,6 +250,8 @@ class DocumentLoader
 public:
     std::shared_ptr<Document> createEmptyDocument(const std::string& path_to_file)
     {
+        std::cout << "Open file - " << path_to_file << "\n";
+
         /* Создаём файл по пути переданному в качестве аргумента и возвращаем его */
 
         return m_current_document;
@@ -258,6 +259,8 @@ public:
 
     std::shared_ptr<Document> loadDocument(const std::string& path_to_file)
     {
+        std::cout << "Open file - " << path_to_file << "\n";
+
         /* Проверяем, что файл существует и валидного расширения. Загружаем файл */
 
         return m_current_document;
