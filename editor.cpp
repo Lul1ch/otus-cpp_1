@@ -116,7 +116,7 @@ public:
     ~GraphicField() override {}
 
 private:
-    std::unique_ptr<std::vector<Figure<T>>> m_figures_vec;
+    std::vector<std::unique_ptr<Figure<T>>> m_figures_vec;
 };
 
 class TextField : public Field
