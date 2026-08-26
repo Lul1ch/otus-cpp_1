@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+      - otus_dz_5
       - feature/github_actions
 
 
