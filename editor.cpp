@@ -376,4 +376,4 @@ int main()
 {
     std::cout << "This is a document editor template\n";
     return 0;
-}
+} 
