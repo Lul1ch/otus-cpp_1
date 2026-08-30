@@ -223,6 +223,8 @@ int main()
 
     std::cout << "Matrix size is " << matrix.size() << "\n";
 
+    ((matrix[5][5] = 314) = 0) = 217;
+
     for (const auto cell : matrix)
     {
         std::cout << "matrix["
