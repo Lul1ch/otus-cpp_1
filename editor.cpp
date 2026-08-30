@@ -300,61 +300,40 @@ private:
     std::shared_ptr<Document> m_current_document;
 };
 
-template <typename T>
 class View
 {
 public:
-    void proccessUIinteraction()
-    {
-        UserRequest* req = tryGetUserRequest();
-        if (req != nullptr)
-        {
-            if (req->isTextFieldEditing())
-            {
-                //m_text_editor->processTextEditRequest(req);
-            }
-            else
-            {
-                //m_graphic_editor->processGraphicEditRequest(req);
-            }
-        }
-    }
-
-    void load(const std::shared_ptr<Document>& doc)
-    {
-        m_text_editor->loadTextPart(doc);
-        m_graphic_editor->loadGraphicPart(doc);
-    }
-
     UserRequest* tryGetUserRequest()
     {
         return nullptr;
     }
-private:
 
-    std::unique_ptr<TextEditor<T>> m_text_editor;
-    std::unique_ptr<GraphicEditor<T>> m_graphic_editor;
-};
-
-template <typename T>
-class Program
-{
-public:
-    void mainThread()
+    void render(const std::shared_ptr<Document>& doc)
     {
-
-        while(true)
+        if (doc.checkDocumentIsValid())
         {
-            m_view->proccessUIinteraction();
-            updatePeriodic();
-            // sleep for several miliseconds
+            // ...
         }
     }
+};
 
-    void openFile(std::string path_to_file)
+class Controller
+{
+public:
+    Controller() 
     {
-        std::shared_ptr<Document> doc = m_document_loader->loadDocument(path_to_file);
-        m_view->load(doc);
+        m_view = std::make_unique<View>();
+        m_document_loader<DocumentLoader> = std::make_unique();
+        m_text_editor<TextEditor<T>> = std::make_unique();
+        m_graphic_editor<GraphicEditor<T>> = std::make_unique();
+    }
+
+    void openFile(const std::string& path_to_file)
+    {
+        m_document = m_document_loader->loadDocument(path_to_file);
+
+        m_text_editor->loadTextPart(m_document);
+        m_graphic_editor->loadGraphicPart(m_document);
     }
 
     void createEmptyFile(std::string path_to_file)
@@ -362,14 +341,46 @@ public:
         std::shared_ptr<Document> doc = m_document_loader->createEmptyDocument(path_to_file);
         m_view->load(doc);
     }
-private:
-    std::unique_ptr<DocumentLoader> m_document_loader;
-    std::unique_ptr<View<T>> m_view;
 
-    void updatePeriodic()
+    void mainLoop()
+    {
+        while(true)
+        {
+            std::unique_ptr req = m_view->tryGetUserRequest();
+
+            if (req != nullptr)
+            {
+                if (req->isTextFieldEditing())
+                {
+                    //m_text_editor->processTextEditRequest(req);
+                }
+                else
+                {
+                    //m_graphic_editor->processGraphicEditRequest(req);
+                }
+            }
+
+            if (m_document != nullptr)
+            {
+                m_view->render(m_document);
+            }
+
+            updatePeriodic();
+        }
+    }
+private:
+    void updatePeriodic() 
     {
         m_document_loader->saveDocument();
-    }
+    }        
+
+    std::shared_ptr<Document> m_document;
+
+    std::unique_ptr<View> m_view;
+
+    std::unique_ptr<TextEditor<T>> m_text_editor;
+    std::unique_ptr<GraphicEditor<T>> m_graphic_editor;
+    std::unique_ptr<DocumentLoader> m_document_loader;
 };
 
 int main()
