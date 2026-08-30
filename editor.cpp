@@ -303,29 +303,30 @@ private:
 class View
 {
 public:
-    UserRequest* tryGetUserRequest()
+    std::unique_ptr<UserRequest> tryGetUserRequest()
     {
-        return nullptr;
+        return std::make_unique<UserRequest>();
     }
 
     void render(const std::shared_ptr<Document>& doc)
     {
-        if (doc.checkDocumentIsValid())
+        if (doc->checkDocumentIsValid())
         {
             // ...
         }
     }
 };
 
+template <typename T>
 class Controller
 {
 public:
     Controller() 
     {
         m_view = std::make_unique<View>();
-        m_document_loader<DocumentLoader> = std::make_unique();
-        m_text_editor<TextEditor<T>> = std::make_unique();
-        m_graphic_editor<GraphicEditor<T>> = std::make_unique();
+        m_document_loader = std::make_unique<DocumentLoader>();
+        m_text_editor = std::make_unique<TextEditor<T>>();
+        m_graphic_editor = std::make_unique<GraphicEditor<T>>();
     }
 
     void openFile(const std::string& path_to_file)
@@ -339,14 +340,16 @@ public:
     void createEmptyFile(std::string path_to_file)
     {
         std::shared_ptr<Document> doc = m_document_loader->createEmptyDocument(path_to_file);
-        m_view->load(doc);
+
+        m_text_editor->loadTextPart(m_document);
+        m_graphic_editor->loadGraphicPart(m_document);
     }
 
     void mainLoop()
     {
         while(true)
         {
-            std::unique_ptr req = m_view->tryGetUserRequest();
+            std::unique_ptr<UserRequest> req = m_view->tryGetUserRequest();
 
             if (req != nullptr)
             {
