@@ -221,7 +221,7 @@ int main()
         std::cout << "\n";
     }
 
-    std::cout << "Matrix size is " << matrix.size() << "\n";
+    std::cout << "Matrix size is " << matrix.size() << " \n";
 
     ((matrix[5][5] = 314) = 0) = 217;
 
