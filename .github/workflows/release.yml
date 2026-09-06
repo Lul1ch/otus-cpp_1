@@ -8,10 +8,6 @@ on:
       - feature/github_actions
 
 jobs:
-  release:
-    permissions:
-      contents: write
-    runs-on: ubuntu-latest
   build:
     runs-on: ubuntu-latest
     steps:
