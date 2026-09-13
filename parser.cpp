@@ -78,7 +78,7 @@ public:
 
     void onBulkReady(const Bulk& bulk) override
     {
-        std::string file_path = std::string("./bulk" + std::to_string(bulk.timestamp) + ".log");
+        std::string file_path = "./bulk" + std::to_string(bulk.timestamp) + ".log";
         std::ofstream file(file_path);
 
         if (!file.is_open())
@@ -112,7 +112,7 @@ public:
         Bulk bulk;
         for(auto cmd : m_current_commands)
         {
-            bulk.commands.push_back(cmd);
+            bulk.commands.push_back(std::move(cmd));
         }
         m_current_commands.clear();
 
@@ -122,7 +122,7 @@ public:
 
     void saveCmd(std::string cmd)
     {
-        m_current_commands.push_back(cmd);  
+        m_current_commands.push_back(std::move(cmd));  
     }
 
 private:
@@ -195,7 +195,7 @@ private:
     size_t m_open_brackets_number = 0;
 };
 
-void completeBulkProcessing(std::unique_ptr<LogicHolder>& logic_holder, std::unique_ptr<BulkCreator>& bulk_creator, std::unique_ptr<BulkProcessor>& bulk_processor, std::time_t& time)
+void completeBulkProcessing(const std::unique_ptr<LogicHolder>& logic_holder, const std::unique_ptr<BulkCreator>& bulk_creator, const std::unique_ptr<BulkProcessor>& bulk_processor, std::time_t& time)
 {
     Bulk bulk = bulk_creator->makeBulk(time);
 
