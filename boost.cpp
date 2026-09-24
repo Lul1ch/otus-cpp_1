@@ -36,7 +36,7 @@ struct BlockHasher
 {
     explicit BlockHasher(bool use_md5) : m_use_md5(use_md5) {}
 
-    std::string hash_block(const std::vector<char>& block) {
+    std::string hashBlock(const std::vector<char>& block) {
         if (m_use_md5) 
         {
             boost::crc_32_type crc;
@@ -69,7 +69,7 @@ struct FileBlockHashes
 // ============================================================================
 // Чтение одного блока из файла
 // ============================================================================
-std::vector<char> read_block(std::ifstream& file, std::size_t block_size) 
+std::vector<char> readBlock(std::ifstream& file, std::size_t block_size) 
 {
     std::vector<char> buffer(block_size);
     file.read(buffer.data(), block_size);
@@ -93,7 +93,7 @@ std::vector<char> read_block(std::ifstream& file, std::size_t block_size)
 // Вычисление хэша следующего блока для группы файлов
 // Возвращает true, если есть файлы, у которых ещё не все блоки обработаны
 // ============================================================================
-bool compute_next_block_hashes(
+bool computeNextBlockHashes(
     std::vector<FileBlockHashes>& files,
     std::size_t block_index,
     std::size_t block_size,
@@ -125,7 +125,7 @@ bool compute_next_block_hashes(
         }
 
         ifs.seekg(offset, std::ios::beg);
-        auto block = read_block(ifs, block_size);
+        auto block = readBlock(ifs, block_size);
 
         if (block.empty()) 
         {
@@ -133,7 +133,7 @@ bool compute_next_block_hashes(
             continue;
         }
 
-        std::string hash = hasher.hash_block(block);
+        std::string hash = hasher.hashBlock(block);
         if (block_index >= file.block_hashes.size()) 
         {
             file.block_hashes.push_back(hash);
@@ -152,7 +152,7 @@ bool compute_next_block_hashes(
 // ============================================================================
 // Разбиение файлов на подгруппы по хэшу текущего блока
 // ============================================================================
-std::vector<std::vector<FileBlockHashes>> group_by_block_hash(
+std::vector<std::vector<FileBlockHashes>> groupByBlockHash(
     std::vector<FileBlockHashes>& files,
     std::size_t block_index)
 {
@@ -186,7 +186,7 @@ std::vector<std::vector<FileBlockHashes>> group_by_block_hash(
 // ============================================================================
 // Поиск дубликатов в группе файлов с одинаковым размером
 // ============================================================================
-std::vector<std::vector<fs::path>> find_duplicates_in_group(
+std::vector<std::vector<fs::path>> findDuplicatesInGroup(
     std::vector<FileBlockHashes>& files,
     std::size_t block_size,
     BlockHasher& hasher)
@@ -203,10 +203,10 @@ std::vector<std::vector<fs::path>> find_duplicates_in_group(
     while (true) 
     {
         // Вычисляем хэши текущего блока для всех файлов, у которых он ещё не вычислен
-        compute_next_block_hashes(files, block_index, block_size, hasher);
+        computeNextBlockHashes(files, block_index, block_size, hasher);
 
         // Разбиваем на подгруппы по хэшу текущего блока
-        auto groups = group_by_block_hash(files, block_index);
+        auto groups = groupByBlockHash(files, block_index);
 
         // Оставляем только группы, где больше одного файла
         std::vector<std::vector<FileBlockHashes>> next_round_files;
@@ -266,7 +266,7 @@ std::vector<std::vector<fs::path>> find_duplicates_in_group(
 // ============================================================================
 // Фильтрация файлов по маскам имени
 // ============================================================================
-bool matches_masks(const fs::path& path,
+bool matchesMasks(const fs::path& path,
                    const std::vector<std::string>& masks) 
 {
     if (masks.empty()) 
@@ -318,7 +318,7 @@ bool matches_masks(const fs::path& path,
 // ============================================================================
 // Сканирование директорий и сбор файлов
 // ============================================================================
-std::vector<FileBlockHashes> scan_files(const Config& config) 
+std::vector<FileBlockHashes> scanFiles(const Config& config) 
 {
     std::vector<FileBlockHashes> files;
 
@@ -342,7 +342,7 @@ std::vector<FileBlockHashes> scan_files(const Config& config)
 
         for (fs::recursive_directory_iterator it(scan_dir), end; it != end; ++it) 
         {
-            if (max_depth >= 0 && it.depth() > static_cast<unsigned int>(max_depth)) 
+            if (max_depth >= 0 && it.depth() > max_depth) 
             {
                 it.pop();
                 continue;
@@ -364,7 +364,7 @@ std::vector<FileBlockHashes> scan_files(const Config& config)
 
             fs::path file_path = it->path();
 
-            if (!matches_masks(file_path, config.filename_masks)) 
+            if (!matchesMasks(file_path, config.filename_masks)) 
             {
                 continue;
             }
@@ -391,7 +391,7 @@ std::vector<FileBlockHashes> scan_files(const Config& config)
 // ============================================================================
 // Разбор аргументов командной строки
 // ============================================================================
-Config parse_args(int argc, char* argv[]) 
+Config parseArgs(int argc, char* argv[]) 
 {
     Config config;
 
@@ -438,7 +438,7 @@ Config parse_args(int argc, char* argv[])
 // ============================================================================
 int main(int argc, char* argv[]) 
 {
-    Config config = parse_args(argc, argv);
+    Config config = parseArgs(argc, argv);
 
     if (config.scan_dirs.empty()) 
     {
@@ -446,7 +446,7 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    auto files = scan_files(config);
+    auto files = scanFiles(config);
 
     if (files.empty()) 
     {
@@ -474,7 +474,7 @@ int main(int argc, char* argv[])
         }
 
         auto duplicate_groups =
-            find_duplicates_in_group(group_files, config.block_size, hasher);
+            findDuplicatesInGroup(group_files, config.block_size, hasher);
 
         for (const auto& dup_group : duplicate_groups) 
         {
