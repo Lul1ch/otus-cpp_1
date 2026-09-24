@@ -21,6 +21,10 @@ target_include_directories(boost
     PRIVATE "${CMAKE_BINARY_DIR}"
 )
 
+target_include_directories(boost
+    PRIVATE ${Boost_INCLUDE_DIRS}
+)
+
 target_link_libraries(boost_cli PRIVATE
     boost
     Boost::filesystem
