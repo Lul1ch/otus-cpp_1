@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.15)
 
 set(PATCH_VERSION "1" CACHE INTERNAL "Patch version")
 set(PROJECT_VESRION 0.0.${PATCH_VERSION})
@@ -23,6 +23,8 @@ target_include_directories(boost
 
 target_link_libraries(boost_cli PRIVATE
     boost
+    Boost::filesystem
+    Boost::regex
 )
 
 if(WITH_BOOST_TEST)
