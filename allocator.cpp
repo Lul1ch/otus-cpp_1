@@ -12,13 +12,13 @@ class MemoryPool
 {
 public:
     MemoryPool()
-        : m_buffer(static_cast<void*>(::operator new(BlocksCount * m_block_size))),
+        : m_buffer(static_cast<void*>(::operator new(BlocksCount * m_block_size, std::align_val_t(m_block_alignment)))),
           m_used(0)
     {}
 
     ~MemoryPool()
     {
-        ::operator delete(m_buffer);
+        ::operator delete(m_buffer, BlocksCount * m_block_size, std::align_val_t(m_block_alignment));
     }
 
     void* allocate_bytes(std::size_t bytes, std::size_t alignment = alignof(std::max_align_t))
@@ -37,7 +37,8 @@ public:
     }
 
 private:
-    static constexpr std::size_t m_block_size = 1;
+    static constexpr std::size_t m_block_size = 64;  // Увеличили размер блока
+    static constexpr std::size_t m_block_alignment = alignof(std::max_align_t);
     void* m_buffer = nullptr;
     std::size_t m_used = 0;
 };
@@ -47,6 +48,12 @@ class CustomAllocator
 {
 public:
     using value_type = T;
+    using pointer = T*;
+    using const_pointer = const T*;
+    using void_pointer = void*;
+    using const_void_pointer = const void*;
+    using size_type = std::size_t;
+    using difference_type = std::ptrdiff_t;
 
     template <typename U>
     struct rebind
@@ -87,6 +94,7 @@ public:
 
     void deallocate(T*, std::size_t) noexcept
     {
+        // Память не освобождаем до уничтожения пула
     }
 
     template <class U, std::size_t C>
@@ -113,11 +121,19 @@ class DynamicArray
 {
 public:
     using traits = std::allocator_traits<Alloc>;
+    using value_type = T;
+    using pointer = T*;
+    using const_pointer = const T*;
+    using reference = T&;
+    using const_reference = const T&;
+    using size_type = std::size_t;
+    using difference_type = std::ptrdiff_t;
 
     explicit DynamicArray(std::size_t capacity, Alloc alloc = Alloc{})
         : m_alloc(std::move(alloc)),
-          m_data(traits::allocate(m_alloc, capacity)),
-          m_capacity(capacity)
+          m_data(capacity > 0 ? traits::allocate(m_alloc, capacity) : nullptr),
+          m_capacity(capacity),
+          m_size(0)
     {}
 
     ~DynamicArray()
@@ -125,6 +141,42 @@ public:
         clear();
         if (m_data)
             traits::deallocate(m_alloc, m_data, m_capacity);
+    }
+
+    // Запрещаем копирование
+    DynamicArray(const DynamicArray&) = delete;
+    DynamicArray& operator=(const DynamicArray&) = delete;
+
+    // Разрешаем перемещение
+    DynamicArray(DynamicArray&& other) noexcept
+        : m_alloc(std::move(other.m_alloc)),
+          m_data(other.m_data),
+          m_capacity(other.m_capacity),
+          m_size(other.m_size)
+    {
+        other.m_data = nullptr;
+        other.m_capacity = 0;
+        other.m_size = 0;
+    }
+
+    DynamicArray& operator=(DynamicArray&& other) noexcept
+    {
+        if (this != &other)
+        {
+            clear();
+            if (m_data)
+                traits::deallocate(m_alloc, m_data, m_capacity);
+
+            m_alloc = std::move(other.m_alloc);
+            m_data = other.m_data;
+            m_capacity = other.m_capacity;
+            m_size = other.m_size;
+
+            other.m_data = nullptr;
+            other.m_capacity = 0;
+            other.m_size = 0;
+        }
+        return *this;
     }
 
     template <class... Args>
@@ -148,7 +200,10 @@ public:
 
     T* begin() noexcept { return m_data; }
     T* end() noexcept { return m_data + m_size; }
+    const T* begin() const noexcept { return m_data; }
+    const T* end() const noexcept { return m_data + m_size; }
     std::size_t size() const noexcept { return m_size; }
+    std::size_t capacity() const noexcept { return m_capacity; }
 
 private:
     Alloc m_alloc;
@@ -168,7 +223,7 @@ int factorial(int n)
 int main()
 {
     using MapValue = std::pair<const int, int>;
-    using MapAlloc = CustomAllocator<MapValue, 10>;
+    using MapAlloc = CustomAllocator<MapValue, 100>;  // Увеличили размер пула
 
     std::map<int, int> map1;
     std::map<int, int, std::less<int>, MapAlloc> map2((std::less<int>()), MapAlloc{});
@@ -209,4 +264,6 @@ int main()
         std::cout << *it << ' ';
     }
     std::cout << "\n";
+
+    return 0;
 }

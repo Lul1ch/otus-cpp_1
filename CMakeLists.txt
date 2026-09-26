@@ -13,7 +13,7 @@ add_executable(allocator_cli allocator.cpp)
 add_library(allocator lib.cpp)
 
 set_target_properties(allocator_cli allocator PROPERTIES
-    CXX_STANDARD 14
+    CXX_STANDARD 17
     CXX_STANDARD_REQUIRED ON
 )
 
