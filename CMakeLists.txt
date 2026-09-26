@@ -5,7 +5,7 @@ set(PROJECT_VESRION 0.0.${PATCH_VERSION})
 
 project(boost VERSION ${PROJECT_VESRION})
 
-find_package(Boost REQUIRED COMPONENTS filesystem regex)
+find_package(Boost REQUIRED COMPONENTS filesystem regex program_options)
 
 option(WITH_BOOST_TEST "Whether to build Boost test" ON)
 
@@ -31,6 +31,7 @@ target_link_libraries(boost_cli PRIVATE
     boost
     Boost::filesystem
     Boost::regex
+    Boost::program_options
 )
 
 if(WITH_BOOST_TEST)
