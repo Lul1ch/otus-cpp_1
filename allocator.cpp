@@ -131,9 +131,9 @@ public:
 
     explicit DynamicArray(std::size_t capacity, Alloc alloc = Alloc{})
         : m_alloc(std::move(alloc)),
-          m_data(capacity > 0 ? traits::allocate(m_alloc, capacity) : nullptr),
-          m_capacity(capacity),
-          m_size(0)
+        m_data(capacity > 0 ? traits::allocate(m_alloc, capacity) : nullptr),
+        m_size(0),
+        m_capacity(capacity)
     {}
 
     ~DynamicArray()
