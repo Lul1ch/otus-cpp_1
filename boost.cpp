@@ -2,6 +2,9 @@
 #include <boost/crc.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/regex.hpp>
+#include <boost/uuid/detail/md5.hpp>
+#include <boost/algorithm/hex.hpp>
+#include <boost/program_options.hpp>
 
 #include <iostream>
 #include <fstream>
@@ -14,6 +17,7 @@
 #include <numeric>
 
 namespace fs = boost::filesystem;
+namespace po = boost::program_options;
 
 // ============================================================================
 // Конфигурация утилиты
@@ -39,9 +43,11 @@ struct BlockHasher
     std::string hashBlock(const std::vector<char>& block) {
         if (m_use_md5) 
         {
-            boost::crc_32_type crc;
-            crc.process_bytes(block.data(), block.size());
-            return std::to_string(crc.checksum());
+            boost::uuids::detail::md5 md5;
+            md5.process_bytes(block.data(), block.size());
+            boost::uuids::detail::md5::digest_type digest;
+            md5.get_digest(digest);
+            return boost::algorithm::hex(std::string(reinterpret_cast<const char*>(&digest), sizeof(digest)));
         } 
         else 
         {
@@ -61,6 +67,7 @@ private:
 struct FileBlockHashes 
 {
     fs::path path;
+    std::ifstream ifs; 
     std::uintmax_t size;
     std::vector<std::string> block_hashes;
     bool fully_computed = false;
@@ -115,17 +122,20 @@ bool computeNextBlockHashes(
             file.fully_computed = true;
             continue;
         }
+        if(!file.ifs.is_open())
+        {
+            file.ifs.open(file.path.string(), std::ios::binary);
+        }
 
-        std::ifstream ifs(file.path.string(), std::ios::binary);
-        if (!ifs) 
+        if (!file.ifs) 
         {
             std::cerr << "Не удалось открыть файл: " << file.path << "\n";
             file.fully_computed = true;
             continue;
         }
 
-        ifs.seekg(offset, std::ios::beg);
-        auto block = readBlock(ifs, block_size);
+        file.ifs.seekg(offset, std::ios::beg);
+        auto block = readBlock(file.ifs, block_size);
 
         if (block.empty()) 
         {
@@ -157,27 +167,49 @@ std::vector<std::vector<FileBlockHashes>> groupByBlockHash(
     std::size_t block_index)
 {
     std::map<std::string, std::vector<FileBlockHashes>> groups;
+    std::vector<FileBlockHashes> pending_files;
 
     for (auto& file : files) 
     {
-        if (block_index >= file.block_hashes.size()) 
+        if (file.fully_computed) 
         {
-            groups["__incomplete__"].push_back(std::move(file));
-        } 
+            // Файл завершён, группируем по последнему хэшу
+            if (!file.block_hashes.empty()) 
+            {
+                groups[file.block_hashes.back()].push_back(std::move(file));
+            }
+            else 
+            {
+                pending_files.push_back(std::move(file));
+            }
+        }
+        else if (block_index < file.block_hashes.size()) 
+        {
+            // Есть хэш для текущего блока
+            groups[file.block_hashes[block_index]].push_back(std::move(file));
+        }
         else 
         {
-            groups[file.block_hashes[block_index]].push_back(std::move(file));
+            // Файл ещё не завершён и нет хэша для текущего блока
+            pending_files.push_back(std::move(file));
         }
     }
 
     std::vector<std::vector<FileBlockHashes>> result;
 
+    // Добавляем группы с совпадающими хэшами
     for (auto& kv : groups) 
     {
-        if (kv.second.size() > 1 || kv.first == "__incomplete__") 
+        if (kv.second.size() > 1) 
         {
             result.push_back(std::move(kv.second));
         }
+    }
+
+    // Добавляем незавершённые файлы как отдельную группу
+    if (pending_files.size() > 1) 
+    {
+        result.push_back(std::move(pending_files));
     }
 
     return result;
@@ -198,22 +230,25 @@ std::vector<std::vector<fs::path>> findDuplicatesInGroup(
         return duplicate_groups;
     }
 
+    // Каждая группа — файлы, совпавшие по всем предыдущим блокам
+    std::vector<std::vector<FileBlockHashes>> current_groups;
+    current_groups.push_back(std::move(files));
+
     std::size_t block_index = 0;
 
-    while (true) 
+    while (!current_groups.empty()) 
     {
-        // Вычисляем хэши текущего блока для всех файлов, у которых он ещё не вычислен
-        computeNextBlockHashes(files, block_index, block_size, hasher);
+        std::vector<std::vector<FileBlockHashes>> next_groups;
 
-        // Разбиваем на подгруппы по хэшу текущего блока
-        auto groups = groupByBlockHash(files, block_index);
-
-        // Оставляем только группы, где больше одного файла
-        std::vector<std::vector<FileBlockHashes>> next_round_files;
-
-        for (auto& group : groups) 
+        // Обрабатываем каждую группу отдельно
+        for (auto& group : current_groups) 
         {
-            // Проверяем, все ли файлы в группе полностью обработаны
+            if (group.empty()) 
+            {
+                continue;
+            }
+
+            // Проверяем, все ли файлы в группе завершены
             bool all_complete = true;
             for (const auto& f : group) 
             {
@@ -226,7 +261,7 @@ std::vector<std::vector<fs::path>> findDuplicatesInGroup(
 
             if (all_complete) 
             {
-                // Все файлы полностью совпали по всем блокам
+                // Все файлы завершены — это группа дубликатов
                 if (group.size() > 1) 
                 {
                     std::vector<fs::path> dup_group;
@@ -236,27 +271,28 @@ std::vector<std::vector<fs::path>> findDuplicatesInGroup(
                     }
                     duplicate_groups.push_back(std::move(dup_group));
                 }
-            } 
-            else 
+                // Иначе группа из 1 файла — не дубликат
+                continue;
+            }
+
+            // Вычисляем хэши текущего блока для этой группы
+            computeNextBlockHashes(group, block_index, block_size, hasher);
+
+            // Разбиваем группу на подгруппы по хэшу текущего блока
+            auto subgroups = groupByBlockHash(group, block_index);
+
+            // Добавляем подгруппы в следующий раунд
+            for (auto& subgroup : subgroups) 
             {
-                // Нужно продолжать сравнение следующих блоков
-                next_round_files.push_back(std::move(group));
+                if (subgroup.size() > 1) 
+                {
+                    next_groups.push_back(std::move(subgroup));
+                }
             }
         }
 
-        if (next_round_files.empty()) 
-        {
-            break;
-        }
-
-        files.clear();
-        for (auto& g : next_round_files) 
-        {
-            files.insert(files.end(),
-                         std::make_move_iterator(g.begin()),
-                         std::make_move_iterator(g.end()));
-        }
-
+        // Переходим к следующей группе
+        current_groups = std::move(next_groups);
         ++block_index;
     }
 
@@ -394,42 +430,82 @@ std::vector<FileBlockHashes> scanFiles(const Config& config)
 Config parseArgs(int argc, char* argv[]) 
 {
     Config config;
-
-    for (int i = 1; i < argc; ++i) {
-        std::string arg = argv[i];
-
-        if (arg == "--scan-dir" && i + 1 < argc) 
+    
+    po::options_description desc("Allowed options");
+    desc.add_options()
+        ("help,h", "Produce help message")
+        ("scan-dir", po::value<std::vector<std::string>>(), 
+         "Directory to scan (can be specified multiple times)")
+        ("exclude-dir", po::value<std::vector<std::string>>(), 
+         "Directory to exclude (can be specified multiple times)")
+        ("depth", po::value<int>()->default_value(-1), 
+         "Scan depth level (-1 = unlimited, 0 = only specified directory)")
+        ("min-size", po::value<std::uintmax_t>()->default_value(1), 
+         "Minimum file size")
+        ("mask", po::value<std::vector<std::string>>(), 
+         "Filename mask (can be specified multiple times)")
+        ("block-size", po::value<std::size_t>()->default_value(4096), 
+         "Block size for reading files")
+        ("hash", po::value<std::string>()->default_value("crc32"), 
+         "Hash algorithm (crc32 or md5)");
+    
+    po::variables_map vm;
+    po::store(po::parse_command_line(argc, argv, desc), vm);
+    po::notify(vm);
+    
+    // Обработка help
+    if (vm.count("help")) 
+    {
+        std::cout << desc << "\n";
+        std::exit(0);
+    }
+    
+    // Заполнение config из variables_map
+    if (vm.count("scan-dir")) 
+    {
+        const auto& dirs = vm["scan-dir"].as<std::vector<std::string>>();
+        for (const auto& dir : dirs) 
         {
-            config.scan_dirs.emplace_back(argv[++i]);
-        } 
-        else if (arg == "--exclude-dir" && i + 1 < argc) 
-        {
-            config.exclude_dirs.emplace_back(argv[++i]);
-        } 
-        else if (arg == "--depth" && i + 1 < argc) 
-        {
-            config.depth_level = std::stoi(argv[++i]);
-        } 
-        else if (arg == "--min-size" && i + 1 < argc) 
-        {
-            config.min_file_size = std::stoull(argv[++i]);
-        } 
-        else if (arg == "--mask" && i + 1 < argc) 
-        {
-            config.filename_masks.push_back(argv[++i]);
-        } 
-        else if (arg == "--block-size" && i + 1 < argc) 
-        {
-            config.block_size = std::stoull(argv[++i]);
-        } 
-        else if (arg == "--hash" && i + 1 < argc) 
-        {
-            std::string hash_type = argv[++i];
-            boost::algorithm::to_lower(hash_type);
-            config.use_md5 = (hash_type == "md5");
+            config.scan_dirs.emplace_back(dir);
         }
     }
-
+    
+    if (vm.count("exclude-dir")) 
+    {
+        const auto& dirs = vm["exclude-dir"].as<std::vector<std::string>>();
+        for (const auto& dir : dirs) 
+        {
+            config.exclude_dirs.emplace_back(dir);
+        }
+    }
+    
+    if (vm.count("depth")) 
+    {
+        config.depth_level = vm["depth"].as<int>();
+    }
+    
+    if (vm.count("min-size")) 
+    {
+        config.min_file_size = vm["min-size"].as<std::uintmax_t>();
+    }
+    
+    if (vm.count("mask")) 
+    {
+        config.filename_masks = vm["mask"].as<std::vector<std::string>>();
+    }
+    
+    if (vm.count("block-size")) 
+    {
+        config.block_size = vm["block-size"].as<std::size_t>();
+    }
+    
+    if (vm.count("hash")) 
+    {
+        std::string hash_type = vm["hash"].as<std::string>();
+        boost::algorithm::to_lower(hash_type);
+        config.use_md5 = (hash_type == "md5");
+    }
+    
     return config;
 }
 
