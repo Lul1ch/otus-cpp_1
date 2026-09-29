@@ -7,18 +7,19 @@
 #include <iterator>
 #include <map>
 
-template <std::size_t BlocksCount>
+
+template <std::size_t TotalBytes, std::size_t Alignment>
 class MemoryPool
 {
 public:
     MemoryPool()
-        : m_buffer(static_cast<void*>(::operator new(BlocksCount * m_block_size, std::align_val_t(m_block_alignment)))),
+        : m_buffer(static_cast<void*>(::operator new(TotalBytes, std::align_val_t(Alignment)))),
           m_used(0)
     {}
 
     ~MemoryPool()
     {
-        ::operator delete(m_buffer, BlocksCount * m_block_size, std::align_val_t(m_block_alignment));
+        ::operator delete(m_buffer, TotalBytes, std::align_val_t(Alignment));
     }
 
     void* allocate_bytes(std::size_t bytes, std::size_t alignment = alignof(std::max_align_t))
@@ -27,7 +28,7 @@ public:
         std::size_t aligned = (current + alignment - 1) & ~(alignment - 1);
         std::size_t offset = aligned - reinterpret_cast<std::size_t>(m_buffer);
 
-        if (offset + bytes > BlocksCount * m_block_size)
+        if (offset + bytes > TotalBytes)
         {
             std::cout << "1\n";
             throw std::bad_alloc();
@@ -37,11 +38,10 @@ public:
     }
 
 private:
-    static constexpr std::size_t m_block_size = 64;  // Увеличили размер блока
-    static constexpr std::size_t m_block_alignment = alignof(std::max_align_t);
     void* m_buffer = nullptr;
     std::size_t m_used = 0;
 };
+
 
 template <typename T, std::size_t BlocksCount>
 class CustomAllocator
@@ -66,7 +66,7 @@ public:
     using propagate_on_container_swap = std::true_type;
 
     CustomAllocator() noexcept
-        : m_pool(std::make_shared<MemoryPool<BlocksCount>>())
+        : m_pool(std::make_shared<MemoryPool<BlocksCount * sizeof(T), alignof(T)>>())
     {}
 
     template <class U>
@@ -101,8 +101,9 @@ public:
     friend class CustomAllocator;
 
 private:
-    std::shared_ptr<MemoryPool<BlocksCount>> m_pool;
+    std::shared_ptr<MemoryPool<BlocksCount * sizeof(T), alignof(T)>> m_pool;
 };
+
 
 template <typename T, std::size_t C, typename U>
 bool operator==(const CustomAllocator<T, C>& a, const CustomAllocator<U, C>& b) noexcept
@@ -115,6 +116,7 @@ bool operator!=(const CustomAllocator<T, C>& a, const CustomAllocator<U, C>& b) 
 {
     return !(a == b);
 }
+
 
 template <class T, class Alloc = std::allocator<T>>
 class DynamicArray
@@ -131,9 +133,9 @@ public:
 
     explicit DynamicArray(std::size_t capacity, Alloc alloc = Alloc{})
         : m_alloc(std::move(alloc)),
-        m_data(capacity > 0 ? traits::allocate(m_alloc, capacity) : nullptr),
-        m_size(0),
-        m_capacity(capacity)
+          m_data(capacity > 0 ? traits::allocate(m_alloc, capacity) : nullptr),
+          m_size(0),
+          m_capacity(capacity)
     {}
 
     ~DynamicArray()
@@ -212,6 +214,7 @@ private:
     std::size_t m_capacity = 0;
 };
 
+
 int factorial(int n)
 {
     int res = 1;
@@ -220,10 +223,11 @@ int factorial(int n)
     return res;
 }
 
+
 int main()
 {
     using MapValue = std::pair<const int, int>;
-    using MapAlloc = CustomAllocator<MapValue, 100>;  // Увеличили размер пула
+    using MapAlloc = CustomAllocator<MapValue, 100>;
 
     std::map<int, int> map1;
     std::map<int, int, std::less<int>, MapAlloc> map2((std::less<int>()), MapAlloc{});
