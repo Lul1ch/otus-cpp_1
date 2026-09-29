@@ -66,7 +66,9 @@ public:
     using propagate_on_container_swap = std::true_type;
 
     CustomAllocator() noexcept
-        : m_pool(std::make_shared<MemoryPool<BlocksCount * sizeof(T), alignof(T)>>())
+        : m_pool(std::shared_ptr<MemoryPool<BlocksCount * sizeof(T), alignof(T)>>(
+              new MemoryPool<BlocksCount * sizeof(T), alignof(T)>()
+          ))
     {}
 
     template <class U>
