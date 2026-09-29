@@ -42,13 +42,15 @@ private:
     std::size_t m_used = 0;
 };
 
-template <std::size_t TotalBytes, std::size_t Alignment>
+template <std::size_t BlocksCount>
 class MemoryPoolHolder
 {
 public:
-    static MemoryPool<TotalBytes, Alignment>& instance()
+    using PoolType = MemoryPool<BlocksCount * sizeof(std::max_align_t), alignof(std::max_align_t)>;
+    
+    static PoolType& instance()
     {
-        static MemoryPool<TotalBytes, Alignment> pool;
+        static PoolType pool;
         return pool;
     }
 };
@@ -77,12 +79,12 @@ public:
     using propagate_on_container_swap = std::true_type;
 
     CustomAllocator() noexcept
-        : m_pool(&MemoryPoolHolder<BlocksCount * sizeof(T), alignof(T)>::instance())
+        : m_pool(&MemoryPoolHolder<BlocksCount>::instance())
     {}
 
     template <class U>
     CustomAllocator(const CustomAllocator<U, BlocksCount>&) noexcept
-        : m_pool(&MemoryPoolHolder<BlocksCount * sizeof(U), alignof(U)>::instance())
+        : m_pool(&MemoryPoolHolder<BlocksCount>::instance())
     {}
 
     CustomAllocator(const CustomAllocator&) noexcept = default;
@@ -112,14 +114,14 @@ public:
     friend class CustomAllocator;
 
 private:
-    MemoryPool<BlocksCount * sizeof(T), alignof(T)>* m_pool;
+    typename MemoryPoolHolder<BlocksCount>::PoolType* m_pool;
 };
 
 
 template <typename T, std::size_t C, typename U>
 bool operator==(const CustomAllocator<T, C>&, const CustomAllocator<U, C>&) noexcept
 {
-    return true;  // Все аллокаторы с одинаковым BlocksCount равны
+    return true;
 }
 
 template <typename T, std::size_t C, typename U>
