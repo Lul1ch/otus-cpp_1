@@ -42,19 +42,6 @@ private:
     std::size_t m_used = 0;
 };
 
-template <std::size_t BlocksCount>
-class MemoryPoolHolder
-{
-public:
-    using PoolType = MemoryPool<BlocksCount * sizeof(std::max_align_t), alignof(std::max_align_t)>;
-    
-    static PoolType& instance()
-    {
-        static PoolType pool;
-        return pool;
-    }
-};
-
 
 template <typename T, std::size_t BlocksCount>
 class CustomAllocator
@@ -67,6 +54,9 @@ public:
     using const_void_pointer = const void*;
     using size_type = std::size_t;
     using difference_type = std::ptrdiff_t;
+    
+    // Приватный тип пула для данной пары (T, BlocksCount)
+    using PoolType = MemoryPool<BlocksCount * sizeof(T), alignof(T)>;
 
     template <typename U>
     struct rebind
@@ -78,13 +68,10 @@ public:
     using propagate_on_container_move_assignment = std::true_type;
     using propagate_on_container_swap = std::true_type;
 
-    CustomAllocator() noexcept
-        : m_pool(&MemoryPoolHolder<BlocksCount>::instance())
-    {}
+    CustomAllocator() noexcept = default;
 
     template <class U>
     CustomAllocator(const CustomAllocator<U, BlocksCount>&) noexcept
-        : m_pool(&MemoryPoolHolder<BlocksCount>::instance())
     {}
 
     CustomAllocator(const CustomAllocator&) noexcept = default;
@@ -101,7 +88,7 @@ public:
             std::cout << "2\n";
             throw std::bad_alloc();
         }
-        void* p = m_pool->allocate_bytes(n * sizeof(T), alignof(T));
+        void* p = pool().allocate_bytes(n * sizeof(T), alignof(T));
         return static_cast<T*>(p);
     }
 
@@ -110,11 +97,15 @@ public:
         // Память не освобождаем до уничтожения пула
     }
 
+    // Статический метод для доступа к единственному экземпляру пула
+    static PoolType& pool()
+    {
+        static PoolType instance;
+        return instance;
+    }
+
     template <class U, std::size_t C>
     friend class CustomAllocator;
-
-private:
-    typename MemoryPoolHolder<BlocksCount>::PoolType* m_pool;
 };
 
 
