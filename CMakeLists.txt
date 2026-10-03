@@ -40,22 +40,21 @@ set_target_properties(async_demo PROPERTIES
 )
 
 if(WITH_BOOST_TEST)
-    find_package(Boost COMPONENTS unit_test_framework REQUIRED)
+    find_package(Boost REQUIRED COMPONENTS unit_test_framework)
 
     add_executable(test_version test_version.cpp)
 
     set_target_properties(test_version PROPERTIES
         CXX_STANDARD 17
         CXX_STANDARD_REQUIRED ON
-        COMPILE_DEFINITIONS BOOST_TEST_DYN_LINK
     )
 
-    target_include_directories(test_version PRIVATE
-        ${CMAKE_BINARY_DIR}
+    target_compile_definitions(test_version PRIVATE
+        BOOST_TEST_DYN_LINK
     )
 
     target_link_libraries(test_version PRIVATE
-        ${Boost_LIBRARIES}
+        Boost::unit_test_framework
         async
     )
 endif()
