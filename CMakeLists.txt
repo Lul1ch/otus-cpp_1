@@ -11,17 +11,22 @@ configure_file(version.h.in version.h)
 
 add_library(async SHARED
     async.cpp
+    lib.cpp
 )
 
 target_include_directories(async
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
-        $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
         $<INSTALL_INTERFACE:include>
+    PRIVATE
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
 )
 
 find_package(Threads REQUIRED)
-target_link_libraries(async PRIVATE Threads::Threads)
+
+target_link_libraries(async PRIVATE
+    Threads::Threads
+)
 
 add_executable(async_demo main.cpp)
 
