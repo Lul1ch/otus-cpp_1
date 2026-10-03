@@ -1,86 +1,99 @@
 cmake_minimum_required(VERSION 3.12)
 
+# Для новых версий CMake (3.30+) и современного Boost.
+if(POLICY CMP0167)
+    cmake_policy(SET CMP0167 NEW)
+endif()
+
 set(PATCH_VERSION "1" CACHE INTERNAL "Patch version")
-set(PROJECT_VESRION 0.0.${PATCH_VERSION})
+set(PROJECT_VERSION 0.0.${PATCH_VERSION})
 
-project(helloworld VERSION ${PROJECT_VESRION})
+project(bulk_server VERSION ${PROJECT_VERSION} LANGUAGES CXX)
 
-option(WITH_BOOST_TEST "Whether to build Boost test" ON)
+find_package(Boost CONFIG REQUIRED)
+find_package(Threads REQUIRED)
 
-configure_file(version.h.in version.h)
-
-add_executable(helloworld_cli main.cpp)
-add_library(helloworld lib.cpp)
-
-set_target_properties(helloworld_cli helloworld PROPERTIES
-    CXX_STANDARD 14
-    CXX_STANDARD_REQUIRED ON
+add_executable(bulk_server
+    bulk_server.cpp
+    lib.cpp
 )
 
-target_include_directories(helloworld
-    PRIVATE "${CMAKE_BINARY_DIR}"
-)
-
-target_link_libraries(helloworld_cli PRIVATE
-    helloworld
-)
+option(WITH_BOOST_TEST "Build unit tests" ON)
 
 if(WITH_BOOST_TEST)
-    find_package(Boost COMPONENTS unit_test_framework REQUIRED)
-    add_executable(test_version test_version.cpp)
+    find_package(Boost CONFIG REQUIRED COMPONENTS unit_test_framework)
 
-    set_target_properties(test_version PROPERTIES
-        CXX_STANDARD 14
-        CXX_STANDARD_REQUIRED ON
+    configure_file(version.h.in version.h)
+
+    add_library(bulk_server_version STATIC
+        lib.cpp
     )
 
-    set_target_properties(test_version PROPERTIES
-        COMPILE_DEFINITIONS BOOST_TEST_DYN_LINK
-        INCLUDE_DIRECTORIES ${Boost_INCLUDE_DIR}
+    target_include_directories(bulk_server_version PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}"
+        "${CMAKE_CURRENT_BINARY_DIR}"
     )
 
-    target_link_libraries(test_version
-        ${Boost_LIBRARIES}
-        helloworld
+    target_compile_features(bulk_server_version PRIVATE cxx_std_17)
+
+    add_executable(test_version
+        test_version.cpp
+    )
+
+    target_compile_features(test_version PRIVATE cxx_std_17)
+
+    target_compile_definitions(test_version PRIVATE
+        BOOST_TEST_DYN_LINK
+    )
+
+    target_link_libraries(test_version PRIVATE
+        bulk_server_version
+        Boost::unit_test_framework
+    )
+
+    enable_testing()
+
+    add_test(NAME test_version COMMAND test_version)
+endif()
+
+target_include_directories(bulk_server PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}"
+    "${CMAKE_CURRENT_BINARY_DIR}"
+)
+
+target_compile_features(bulk_server PRIVATE cxx_std_17)
+
+target_link_libraries(bulk_server PRIVATE
+    Boost::headers
+    Threads::Threads
+)
+
+if(MSVC)
+    target_compile_options(bulk_server PRIVATE
+        /W4
+    )
+else()
+    target_compile_options(bulk_server PRIVATE
+        -Wall
+        -Wextra
+        -pedantic
+        -Werror
     )
 endif()
 
-if (MSVC)
-    target_compile_options(helloworld_cli PRIVATE
-        /W4
-    )
-    target_compile_options(helloworld PRIVATE
-        /W4
-    )
-    if(WITH_BOOST_TEST)
-        target_compile_options(test_version PRIVATE
-            /W4
-        )
-    endif()
-else ()
-    target_compile_options(helloworld_cli PRIVATE
-        -Wall -Wextra -pedantic -Werror
-    )
-    target_compile_options(helloworld PRIVATE
-        -Wall -Wextra -pedantic -Werror
-    )
-    if(WITH_BOOST_TEST)
-        target_compile_options(test_version PRIVATE
-            -Wall -Wextra -pedantic -Werror
-        )
-    endif()
-endif()
-
-install(TARGETS helloworld_cli RUNTIME DESTINATION bin)
+install(TARGETS bulk_server
+    RUNTIME DESTINATION bin
+)
 
 set(CPACK_GENERATOR DEB)
-set(CPACK_PACKAGE_VERSION_MAJOR "${PROJECT_VERSION_MAJOR}")
-set(CPACK_PACKAGE_VERSION_MINOR "${PROJECT_VERSION_MINOR}")
-set(CPACK_PACKAGE_VERSION_PATCH "${PROJECT_VERSION_PATCH}")
-set(CPACK_PACKAGE_CONTACT example@example.com)
-include(CPack)
+set(CPACK_PACKAGE_NAME "bulk_server")
+set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
+set(CPACK_PACKAGE_CONTACT "example@example.com")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY
+    "Asynchronous TCP server for bulk command processing"
+)
 
-if(WITH_BOOST_TEST)
-    enable_testing()
-    add_test(test_version test_version)
-endif()
+# Формат имени: bulk-server_0.0.N_amd64.deb
+set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
+
+include(CPack)
