@@ -1,44 +1,58 @@
-name: 'C++ CI'
+name: C++ CI
 
 on:
   push:
     branches:
       - master
+      - otus_dz_11
       - feature/github_actions
 
 jobs:
-  release:
-    permissions:
-      contents: write
-    runs-on: ubuntu-latest
   build:
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
     steps:
-      - uses: actions/checkout@v2
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            libboost-all-dev
+
+      - name: Configure
+        run: |
+          cmake -S . -B build \
+            -DPATCH_VERSION=${{ github.run_number }}
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Run tests
+        if: ${{ hashFiles('test_version.cpp') != '' }}
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Package
+        run: cmake --build build --target package
+
+      - name: Show package
+        run: |
+          ls -lh build/*.deb
+          dpkg-deb --contents build/*.deb
+
+      - name: Create release and upload DEB
+        uses: softprops/action-gh-release@v2
         with:
-          submodules: true
-      - run: sudo apt-get update && sudo apt-get install libboost-test-dev -y
-      - run: cmake . -DPATCH_VERSION=${{ github.run_number }} -DWITH_BOOST_TEST=ON
-      - run: cmake --build .
-      - run: cmake --build . --target test
-      - run: cmake --build . --target package
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
+          tag_name: v0.0.${{ github.run_number }}
+          name: join_server 0.0.${{ github.run_number }}
+          files: build/*.deb
+          fail_on_unmatched_files: true
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.run_number }}
-          release_name: Release ${{ github.run_number }}
-          draft: false
-          prerelease: false
-      - name: Upload Release Asset
-        id: upload-release-asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./helloworld-0.0.${{ github.run_number }}-Linux.deb
-          asset_name: helloworld-0.0.${{ github.run_number }}-Linux.deb
-          asset_content_type: application/vnd.debian.binary-package
