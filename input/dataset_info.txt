@@ -1,0 +1,2 @@
+Здесь можно почитать подробнее про датасет:
+https://www.kaggle.com/datasets/dgomonov/new-york-city-airbnb-open-data?resource=download
