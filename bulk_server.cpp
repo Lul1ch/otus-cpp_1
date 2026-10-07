@@ -17,6 +17,8 @@
 namespace asio = boost::asio;
 using tcp = asio::ip::tcp;
 
+std::atomic<int> unique_id = 0;
+
 struct Bulk
 {
     std::time_t timestamp = 0;
@@ -142,8 +144,10 @@ private:
             const std::string path = "./bulk" +
                 std::to_string(bulk.timestamp) + "_" +
                 std::to_string(bulk.sequence) + "_" +
-                std::to_string(worker_id) + ".log";
+                std::to_string(worker_id)
+                std::to_string(unique_id) + ".log";
 
+            unique_id.fetch_add(1);
             std::ofstream file(path);
 
             if (!file.is_open())
@@ -316,6 +320,7 @@ private:
             if (bracket_depth_ == 1)
             {
                 dynamic_timestamp_ = std::time(nullptr);
+                static_collector_->complete();
             }
         }
         else if (line == "}")
