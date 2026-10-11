@@ -436,6 +436,7 @@ int main(int argc, char* argv[])
         std::cerr << "Usage: " << argv[0] << " <port> <bulk_size>\n";
         return 1;
     }
+    
 
     try
     {
