@@ -144,7 +144,7 @@ private:
             const std::string path = "./bulk" +
                 std::to_string(bulk.timestamp) + "_" +
                 std::to_string(bulk.sequence) + "_" +
-                std::to_string(worker_id)
+                std::to_string(worker_id) +
                 std::to_string(unique_id) + ".log";
 
             unique_id.fetch_add(1);
@@ -211,6 +211,16 @@ public:
 
         // Публикуем остаток только когда клиентов больше нет.
         if (active_clients_ == 0 && !commands_.empty())
+        {
+            complete();
+        }
+    }
+
+    void flush()
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+
+        if (!commands_.empty())
         {
             complete();
         }
@@ -315,12 +325,16 @@ private:
 
         if (line == "{")
         {
+            if (bracket_depth_ == 0)
+            {
+                static_collector_->flush();
+            }
+
             ++bracket_depth_;
 
             if (bracket_depth_ == 1)
             {
                 dynamic_timestamp_ = std::time(nullptr);
-                static_collector_->complete();
             }
         }
         else if (line == "}")
@@ -436,7 +450,7 @@ int main(int argc, char* argv[])
         std::cerr << "Usage: " << argv[0] << " <port> <bulk_size>\n";
         return 1;
     }
-    
+
 
     try
     {
