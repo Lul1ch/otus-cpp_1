@@ -1,86 +1,72 @@
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.14)
+project(fashion_mnist LANGUAGES CXX)
 
-set(PATCH_VERSION "1" CACHE INTERNAL "Patch version")
-set(PROJECT_VESRION 0.0.${PATCH_VERSION})
-
-project(helloworld VERSION ${PROJECT_VESRION})
-
-option(WITH_BOOST_TEST "Whether to build Boost test" ON)
-
-configure_file(version.h.in version.h)
-
-add_executable(helloworld_cli main.cpp)
-add_library(helloworld lib.cpp)
-
-set_target_properties(helloworld_cli helloworld PROPERTIES
-    CXX_STANDARD 14
-    CXX_STANDARD_REQUIRED ON
-)
-
-target_include_directories(helloworld
-    PRIVATE "${CMAKE_BINARY_DIR}"
-)
-
-target_link_libraries(helloworld_cli PRIVATE
-    helloworld
-)
-
-if(WITH_BOOST_TEST)
-    find_package(Boost COMPONENTS unit_test_framework REQUIRED)
-    add_executable(test_version test_version.cpp)
-
-    set_target_properties(test_version PROPERTIES
-        CXX_STANDARD 14
-        CXX_STANDARD_REQUIRED ON
-    )
-
-    set_target_properties(test_version PROPERTIES
-        COMPILE_DEFINITIONS BOOST_TEST_DYN_LINK
-        INCLUDE_DIRECTORIES ${Boost_INCLUDE_DIR}
-    )
-
-    target_link_libraries(test_version
-        ${Boost_LIBRARIES}
-        helloworld
-    )
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release)
 endif()
 
-if (MSVC)
-    target_compile_options(helloworld_cli PRIVATE
-        /W4
-    )
-    target_compile_options(helloworld PRIVATE
-        /W4
-    )
-    if(WITH_BOOST_TEST)
-        target_compile_options(test_version PRIVATE
-            /W4
-        )
-    endif()
-else ()
-    target_compile_options(helloworld_cli PRIVATE
-        -Wall -Wextra -pedantic -Werror
-    )
-    target_compile_options(helloworld PRIVATE
-        -Wall -Wextra -pedantic -Werror
-    )
-    if(WITH_BOOST_TEST)
-        target_compile_options(test_version PRIVATE
-            -Wall -Wextra -pedantic -Werror
-        )
-    endif()
+option(BUILD_TESTING "Build unit tests" ON)
+
+# ---------- CatBoost ----------
+# По умолчанию ищем библиотеку в third_party/catboost (см. scripts/download_catboost.sh).
+# Для Docker-образа sdukshis/cppml: -DCATBOOST_ROOT=/usr/local
+set(CATBOOST_ROOT "${CMAKE_SOURCE_DIR}/third_party/catboost" CACHE PATH "CatBoost location")
+
+find_path(CATBOOST_INCLUDE_DIR c_api.h
+    HINTS ${CATBOOST_ROOT} ${CATBOOST_ROOT}/include ${CATBOOST_ROOT}/include/catboost
+    NO_DEFAULT_PATH)
+find_library(CATBOOST_LIBRARY NAMES catboostmodel catboost
+    HINTS ${CATBOOST_ROOT} ${CATBOOST_ROOT}/lib
+    NO_DEFAULT_PATH)
+
+if(NOT CATBOOST_INCLUDE_DIR OR NOT CATBOOST_LIBRARY)
+    message(FATAL_ERROR "CatBoost not found in ${CATBOOST_ROOT}. "
+                        "Run scripts/download_catboost.sh or pass -DCATBOOST_ROOT=<path>")
 endif()
+message(STATUS "CatBoost header: ${CATBOOST_INCLUDE_DIR}")
+message(STATUS "CatBoost library: ${CATBOOST_LIBRARY}")
 
-install(TARGETS helloworld_cli RUNTIME DESTINATION bin)
+add_library(catboost_model SHARED IMPORTED)
+set_target_properties(catboost_model PROPERTIES
+    IMPORTED_LOCATION "${CATBOOST_LIBRARY}"
+    INTERFACE_INCLUDE_DIRECTORIES "${CATBOOST_INCLUDE_DIR}")
 
-set(CPACK_GENERATOR DEB)
-set(CPACK_PACKAGE_VERSION_MAJOR "${PROJECT_VERSION_MAJOR}")
-set(CPACK_PACKAGE_VERSION_MINOR "${PROJECT_VERSION_MINOR}")
-set(CPACK_PACKAGE_VERSION_PATCH "${PROJECT_VERSION_PATCH}")
-set(CPACK_PACKAGE_CONTACT example@example.com)
-include(CPack)
+# ---------- Код проекта ----------
+add_library(fashion_mnist_core STATIC
+    src/dataset.cpp
+    src/accuracy.cpp
+    src/catboost_classifier.cpp)
+target_include_directories(fashion_mnist_core PUBLIC src)
+target_link_libraries(fashion_mnist_core PUBLIC catboost_model)
+target_compile_options(fashion_mnist_core PRIVATE -Wall -Wextra -pedantic)
 
-if(WITH_BOOST_TEST)
+add_executable(fashion_mnist src/main.cpp)
+target_link_libraries(fashion_mnist PRIVATE fashion_mnist_core)
+target_compile_options(fashion_mnist PRIVATE -Wall -Wextra -pedantic)
+
+# Чтобы бинарник находил .so без LD_LIBRARY_PATH
+get_filename_component(CATBOOST_LIBRARY_DIR "${CATBOOST_LIBRARY}" DIRECTORY)
+set_target_properties(fashion_mnist PROPERTIES BUILD_RPATH "${CATBOOST_LIBRARY_DIR}")
+
+# ---------- Тесты ----------
+if(BUILD_TESTING)
     enable_testing()
-    add_test(test_version test_version)
+    include(FetchContent)
+    FetchContent_Declare(googletest
+        URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip
+        DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+    set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(googletest)
+
+    add_executable(unit_tests tests/test_dataset.cpp tests/test_model.cpp)
+    target_link_libraries(unit_tests PRIVATE fashion_mnist_core GTest::gtest_main)
+    target_compile_definitions(unit_tests PRIVATE
+        TEST_DATA_DIR="${CMAKE_SOURCE_DIR}/tests/data"
+        MODEL_PATH="${CMAKE_SOURCE_DIR}/model.cbm")
+    set_target_properties(unit_tests PROPERTIES BUILD_RPATH "${CATBOOST_LIBRARY_DIR}")
+
+    include(GoogleTest)
+    gtest_discover_tests(unit_tests)
 endif()
