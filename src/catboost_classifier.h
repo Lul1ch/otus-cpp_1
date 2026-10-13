@@ -1,12 +1,17 @@
 #pragma once
 
 #include <cstddef>
+#include <memory>
 #include <string>
 #include <vector>
 
 #include "classifier.h"
 
 namespace fashion_mnist {
+
+struct CatBoostDeleter {
+    void operator()(void* handle) const noexcept;
+};
 
 // RAII-обёртка над C API CatBoost.
 class CatBoostClassifier final : public IClassifier {
@@ -27,7 +32,7 @@ public:
     std::size_t dimensionCount() const { return dimension_count_; }
 
 private:
-    void* handle_ = nullptr;  // ModelCalcerHandle* из c_api.h (typedef void)
+    std::unique_ptr<void, CatBoostDeleter> handle_;
     std::size_t feature_count_ = 0;
     std::size_t dimension_count_ = 0;
 };

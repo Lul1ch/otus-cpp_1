@@ -11,7 +11,9 @@ EvaluationResult evaluate(const IClassifier& classifier, std::istream& csv) {
     EvaluationResult result;
     CsvDatasetReader reader(csv);
     try {
-        while (auto sample = reader.next()) {
+        Sample sample_example;
+
+        while (auto sample = reader.next(sample_example)) {
             ++result.total;
             if (classifier.predict(sample->pixels) == sample->label) {
                 ++result.correct;

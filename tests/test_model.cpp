@@ -56,7 +56,9 @@ TEST(CatBoostClassifier, RawPredictionsMatchPython) {
     std::ifstream csv(kSample);
     CsvDatasetReader reader(csv);
     std::size_t i = 0;
-    while (auto sample = reader.next()) {
+
+    Sample sample_test;
+    while (auto sample = reader.next(sample_test)) {
         ASSERT_LT(i, expected.size());
         const auto raw = model.predictRaw(sample->pixels);
         ASSERT_EQ(raw.size(), expected[i].size());

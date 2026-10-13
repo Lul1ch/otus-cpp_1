@@ -21,8 +21,7 @@ int parseInt(const char* begin, const char* end) {
 
 }  // namespace
 
-Sample parseCsvLine(const std::string& line) {
-    Sample sample;
+Sample parseCsvLine(const std::string& line, Sample& sample) {
     sample.pixels.reserve(kImageSize);
 
     const char* cur = line.data();
@@ -63,12 +62,12 @@ Sample parseCsvLine(const std::string& line) {
 
 CsvDatasetReader::CsvDatasetReader(std::istream& input) : input_(input) {}
 
-std::optional<Sample> CsvDatasetReader::next() {
+std::optional<Sample> CsvDatasetReader::next(Sample& out) {
     std::string line;
     while (std::getline(input_, line)) {
         ++line_number_;
         if (line.find_first_not_of(" \t\r") == std::string::npos) continue;
-        return parseCsvLine(line);
+        return parseCsvLine(line, out);
     }
     return std::nullopt;
 }

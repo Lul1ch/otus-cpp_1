@@ -18,7 +18,7 @@ struct Sample {
 
 // Разбирает одну строку CSV: "label,p1,...,p784".
 // Бросает std::runtime_error при неверном формате.
-Sample parseCsvLine(const std::string& line);
+Sample parseCsvLine(const std::string& line, Sample& sample);
 
 // Построчное чтение тестового набора без загрузки всего файла в память.
 class CsvDatasetReader {
@@ -27,7 +27,7 @@ public:
 
     // Возвращает следующий объект или std::nullopt в конце файла.
     // Пустые строки пропускаются.
-    std::optional<Sample> next();
+    std::optional<Sample> next(Sample& out);
 
     std::size_t lineNumber() const { return line_number_; }
 
