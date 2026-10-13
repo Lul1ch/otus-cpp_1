@@ -16,7 +16,8 @@ struct Sample {
     std::vector<float> pixels;  // 784 значения 0..255, без нормализации
 };
 
-// Разбирает одну строку CSV: "label,p1,...,p784".
+// Разбирает одну строку данных CSV: "label,p1,...,p784".
+// Записывает результат в sample и возвращает его копию.
 // Бросает std::runtime_error при неверном формате.
 Sample parseCsvLine(const std::string& line, Sample& sample);
 
@@ -25,8 +26,11 @@ class CsvDatasetReader {
 public:
     explicit CsvDatasetReader(std::istream& input);
 
-    // Возвращает следующий объект или std::nullopt в конце файла.
+    // Заполняет out и возвращает следующий объект,
+    // либо std::nullopt в конце файла.
     // Пустые строки пропускаются.
+    // Первая непустая строка может быть заголовком
+    // "label,pixel1,...,pixel784".
     std::optional<Sample> next(Sample& out);
 
     std::size_t lineNumber() const { return line_number_; }
@@ -34,6 +38,7 @@ public:
 private:
     std::istream& input_;
     std::size_t line_number_ = 0;
+    bool first_nonempty_line_ = true;
 };
 
 }  // namespace fashion_mnist
