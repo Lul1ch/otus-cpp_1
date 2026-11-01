@@ -1,0 +1,22 @@
+{
+    "pets": [
+        {
+            "name": "Пушинка",
+            "age": 2,
+            "gender": "female",
+            "weight": 3.8,
+            "height": 25.5,
+            "is_sterilized": true,
+            "species": "cat"
+        },
+        {
+            "name": "Шарик",
+            "age": 5,
+            "gender": "male",
+            "weight": 21.4,
+            "height": 120.1,
+            "is_sterilized": false,
+            "species": "dog"
+        }
+    ]
+}
